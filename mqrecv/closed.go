@@ -6,9 +6,11 @@ import (
     "syscall"
     "fmt"
     "time"
+    "runtime"
 )
 
 var (
+    exitReadyChan chan bool
     errChan chan int
     closeChan chan struct{}
 )
@@ -18,7 +20,8 @@ func Recv(sigCh chan struct{}) {
         select {
             case _, ok := <- sigCh:
                 if !ok {
-                    fmt.Println("Recv finished")
+                    //fmt.Println("Recv finished")
+                    fmt.Printf("Recv finished, %d\n",time.Now().Unix())
                     return
                 }
             default:
@@ -33,7 +36,8 @@ func Send(sigCh chan struct{}) {
         select {
             case _, ok := <- sigCh:
                 if !ok {
-                    fmt.Println("Send finished")
+                    //fmt.Println("Send finished")
+                    fmt.Printf("Send finished, %d\n",time.Now().Unix())
                     return
                 }
             default:
@@ -49,6 +53,8 @@ func Start() {
         case _, ok := <- closeChan:
             if !ok {
                 fmt.Printf("Closed\n")
+                exitReadyChan <- true
+                return
             }
         default:
             sigChan := make(chan struct{})
@@ -57,10 +63,12 @@ func Start() {
             select{
             case err := <- errChan:
                 close(sigChan)
-                fmt.Printf("Error: %d\n",err)
+                fmt.Printf("Error: %d, %d\n",err,time.Now().Unix())
             case _, ok := <- closeChan:
                 if !ok {
+                    close(sigChan)
                     fmt.Printf("Closed2\n")
+                    exitReadyChan <- true
                     return
                 }
             }
@@ -69,18 +77,24 @@ func Start() {
 }
 
 func Error() {
+    cnt := 1
     for {
         time.Sleep(20 * time.Second)
-        errChan <- 1
-        fmt.Println("Send error")
+        errChan <- cnt
+        cnt += 1
+        fmt.Printf("Send Error: %d\n",time.Now().Unix())
     }
 }
 
 func Stop() {
     close(closeChan)
+    fmt.Println("Stop")
 }
 
 func main() {
+    runtime.GOMAXPROCS(runtime.NumCPU())
+
+    exitReadyChan = make(chan bool)
     errChan = make(chan int)
     closeChan = make(chan struct{})
     go Start()
@@ -91,6 +105,6 @@ func main() {
     sig := <-signals
     fmt.Println(sig.String())
     Stop()
-    time.Sleep(2 * time.Second)
+    <-exitReadyChan // wait goroutine `Start` close first
     os.Exit(0)
 }
