@@ -1,0 +1,3 @@
+closed.go主要用于测试出错自动重连机制，主要使用channel实现，可以参照beego的log模块，其主要使用channel接收close或flush信号
+
+main.go和client.go是用于测试rabbitmq的通信，main是server端，server端使用不同的routingKey给多个clients发送信息，client端通过declare queuename并且绑定相应的routingKey接收自己的server端发送的信息，并定时给server发送心跳信息，所有clients发送的心跳信息使用同一个routingKey给server端发送。
